@@ -1,0 +1,43 @@
+name: CI – Train, Serve & Test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  train-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -e .
+
+      - name: Train model from data/ CSVs
+        run: python -m training.scripts.train_from_minimal_csv
+
+      - name: Start API server
+        run: |
+          export CESAR_MODEL_PATH=$(pwd)/artifact_storage/model_minimal.joblib
+          export CESAR_CONTRACT_PATH=$(pwd)/artifact_storage/contract_minimal.json
+          uvicorn runtime.prediction_api.app:app --host 0.0.0.0 --port 8000 &
+          echo "Waiting for API to be ready..."
+          for i in $(seq 1 30); do
+            if curl -s http://localhost:8000/health > /dev/null 2>&1; then
+              echo "API is ready!"
+              break
+            fi
+            sleep 1
+          done
+
+      - name: Run acceptance tests
+        run: cesar acceptance-tests run --base-url http://localhost:8000
