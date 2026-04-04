@@ -1,22 +1,83 @@
 # CESAR – CentraleSupelec-ESSEC System for Asset Rating
 
-CESAR is a modular system to manage the lifecycle of a property valuation model and its uses: **batch prediction** (CSV in/out), **single-record prediction** (CLI), **HTTP API** (FastAPI), **acceptance tests** against the API, **version comparison** of two APIs, and a minimal **web UI**. 
+[![CI – Train, Serve & Test](https://github.com/SachaKsk/cesar-mlops/actions/workflows/ci.yml/badge.svg)](https://github.com/SachaKsk/cesar-mlops/actions/workflows/ci.yml)
+
+CESAR is a complete MLOps system for training, serving, and testing a **French property valuation model**. It covers the full lifecycle: data ingestion, model training, experiment tracking, API serving, batch prediction, acceptance testing, CI/CD, and deployment.
+
+---
+
+## Features
+
+| Feature | Description |
+|---------|-------------|
+| **Training pipeline** | Load DVF CSVs → feature engineering → train RandomForest → export versioned artifacts |
+| **FastAPI serving** | `POST /estimate/` with JSON, `GET /health` for monitoring |
+| **Confidence intervals** | Price range (low/high) using per-tree prediction percentiles |
+| **Batch prediction** | CSV in → estimates → CSV out via CLI |
+| **Web UI** | Interactive form + Leaflet map of France |
+| **Acceptance tests** | Automated test cases run against the live API |
+| **CI/CD** | GitHub Actions: train → serve → test on every push/PR |
+| **Experiment tracking** | CSV-based run logging with metrics comparison |
+| **Docker & Kubernetes** | Dockerfiles, docker-compose, canary & blue-green deployments |
+
+---
+
+## Architecture
+
+```
+┌─────────────┐     ┌──────────────────┐     ┌─────────────────┐
+│  DVF Data    │────▶│  Training        │────▶│  Artifact Store │
+│  (CSVs)      │     │  (RandomForest)  │     │  (.joblib+.json)│
+└─────────────┘     └──────────────────┘     └────────┬────────┘
+                            │                          │
+                    ┌───────▼────────┐                 │
+                    │ Experiment Log │                  │
+                    │ (CSV tracker)  │                  │
+                    └────────────────┘                  │
+                                                       │
+                ┌──────────────────────────────────────┘
+                │
+                ▼
+┌──────────────────────────┐
+│      FastAPI Server      │
+│  POST /estimate/         │
+│  GET  /health            │
+└──────┬───────────────────┘
+       │
+       ├──────────────┐
+       ▼              ▼
+┌────────────┐  ┌───────────┐
+│  Web UI    │  │   CLI     │
+│  (Vite +   │  │  (Typer)  │
+│  Leaflet)  │  │  batch /  │
+│            │  │  single   │
+└────────────┘  └───────────┘
+
+       ▲
+       │
+┌──────┴─────────────┐     ┌────────────────────┐
+│ Acceptance Tests   │     │ GitHub Actions CI   │
+│ (auto validation)  │────▶│ train → serve → test│
+└────────────────────┘     └────────────────────┘
+```
 
 ---
 
 ## Goal
 
-- **Goal:** Estimate the value of a property (e.g. `valeur_fonciere`) from a small set of features (surface, number of rooms, department, property type).
-- **Uses:** (1) CLI: CSV → estimates → CSV or one record → one estimate. (2) API: POST `/estimate/` with JSON. (3) UI: form + map to input parameters and display the estimate.
+Estimate the value of a property (`valeur_fonciere`) from a small set of features:
+- **Surface** (m²)
+- **Number of rooms**
+- **Department code**
+- **Property type** (Appartement, Maison, Dépendance, Local industriel)
 
 ---
 
 ## Source data
 
-You can use data from DVF:
-https://app.dvf.etalab.gouv.fr/ (new version at: https://explore.data.gouv.fr/fr/immobilier)
+- **Primary:** [DVF – Données de Valeurs Foncières](https://app.dvf.etalab.gouv.fr/) (also at [explore.data.gouv.fr](https://explore.data.gouv.fr/fr/immobilier))
+- Additional data from other sources or synthetic data can be used.
 
-You may also use additional data from other sources, including synthetic (fake) data.
 ---
 
 ## How to run
@@ -210,3 +271,41 @@ Pick one option and plug it into the API and (optionally) the UI; even a simple 
 - “API + deployment”: add `/health` and `/model_info`, then add readiness/liveness probes in the Kubernetes deployment so the cluster only sends traffic when the model is loaded.
 
 Pick something that excites you and fits your timeline; even one of these will deepen your understanding of the stack.
+
+---
+
+## What we implemented
+
+Our team extended the base CESAR project with three features:
+
+### 1. CI/CD Pipeline (GitHub Actions)
+Automated workflow that runs on every push and pull request:
+- Installs dependencies
+- Trains the model from `data/` CSVs
+- Starts the API server
+- Runs acceptance tests against the live API
+
+See [`.github/workflows/ci.yml`](.github/workflows/ci.yml).
+
+### 2. Confidence Intervals
+The API now returns a price **range** alongside the point estimate:
+- Uses per-tree predictions from the RandomForest ensemble
+- Computes 5th and 95th percentiles across all 50 trees
+- Returns `value_low_eur` and `value_high_eur` in the response
+- Displayed visually in the web UI
+
+### 3. Data Enrichment & Experiment Comparison
+- Added additional DVF data extracts for broader geographic coverage
+- Implemented train/test split with evaluation metrics (MAE, RMSE, R²)
+- Logged and compared multiple training runs via the experiment tracker
+- Results show impact of data volume and diversity on model performance
+
+---
+
+## Team
+
+| Member | Contribution |
+|--------|-------------|
+| [SachaKsk](https://github.com/SachaKsk) | CI/CD pipeline, README, project coordination |
+| [haiiiio](https://github.com/haiiiio) | Confidence intervals (inference + UI) |
+| [qrebut](https://github.com/qrebut) | Data enrichment & experiment comparison |
