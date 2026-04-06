@@ -1,3 +1,7 @@
+#builds both the API and UI containers locally
+#run with: docker compose -f deployment/docker-compose.yml up --build
+#the model files are mounted from artifact_storage/ so we don't have to rebuild to swap models
+
 services:
   api:
     build:
