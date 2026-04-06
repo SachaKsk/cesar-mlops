@@ -1,11 +1,7 @@
-# Local dev: build API and UI; mount artifact_storage for model/contract.
-# Run from repo root: docker compose -f deployment/docker-compose.yml up
-# API = 1 container (scale with replicas if you want); UI = 1 container.
-
 services:
   api:
     build:
-      context: .
+      context: ..
       dockerfile: deployment/Dockerfile.api
     ports:
       - "8000:8000"
@@ -13,15 +9,19 @@ services:
       - CESAR_MODEL_PATH=/artifacts/model_latest.joblib
       - CESAR_CONTRACT_PATH=/artifacts/contract_latest.json
     volumes:
-      - ./artifact_storage:/artifacts:ro
-    # Ideas: add healthcheck, resource limits, configmap for paths
+      - ../artifact_storage:/artifacts:ro
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
 
   ui:
     build:
-      context: .
+      context: ..
       dockerfile: deployment/Dockerfile.ui
     ports:
       - "8080:80"
-    # Ideas: proxy /api to api:8000 so CESAR_API_BASE can stay /api
     depends_on:
-      - api
+      api:
+        condition: service_healthy
