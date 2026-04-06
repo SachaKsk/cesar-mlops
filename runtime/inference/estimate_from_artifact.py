@@ -43,8 +43,20 @@ def request_to_feature_row(request: EstimateRequest, contract: ContractVersion) 
     return np.array(ordered, dtype=np.float64).reshape(1, -1)
 
 
-def estimate_from_model(model: Any, request: EstimateRequest, contract: ContractVersion) -> EstimateResponse:
+def estimate_from_model(model: Any, request: EstimateRequest, contract: ContractVersion) -> EstimateResponse: #assuming a 50 tree randomforest 
     X = request_to_feature_row(request, contract)
     pred = model.predict(X)
-    value = float(pred.flat[0])
+    value = float(pred.flat[0]) #standard point estimate, the avg we were previously outputting
+   
+    if hasattr(model, 'estimators_'): #confidence interval estimation implementation
+        tree_predictions = [float(tree.predict(X).flat[0]) for tree in model.estimators_] #retrieve average from each of the 50 trees
+        value_low_eur = float(np.percentile(tree_predictions, 5)) #lower bound of the interval, 5th percentile of averages
+        value_high_eur = float(np.percentile(tree_predictions, 95)) #upper bound of the interval, 95th percentile of averages
+        return EstimateResponse( #output: average+confidence interval  
+            estimated_value_eur=value,
+            value_low_eur=value_low_eur,
+            value_high_eur=value_high_eur
+        )
+    
+    #fallback in case a different model type is loaded later
     return EstimateResponse(estimated_value_eur=value)

@@ -39,6 +39,7 @@ def health() -> dict[str, str]:
 
 
 @app.post("/estimate/", response_model=EstimateResponse)
+#this will return the EstimateResponse object with confidence intervals (value_low_eur, value_high_eur) if model supports them, else just point estimate
 def post_estimate(
     request: EstimateRequest,
     artifact: Annotated[tuple[object, ContractVersion], Depends(get_artifact)],
@@ -48,3 +49,5 @@ def post_estimate(
         return estimate_from_model(model, request, contract)
     except InvalidFeatureError as e:
         raise HTTPException(status_code=422, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Internal error: {str(e)}")
