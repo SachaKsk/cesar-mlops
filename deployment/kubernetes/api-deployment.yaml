@@ -32,18 +32,15 @@ spec:
               value: "/artifacts/model_latest.joblib"
             - name: CESAR_CONTRACT_PATH
               value: "/artifacts/contract_latest.json"
-          # Optional: mount a volume here so the pod can read model/contract files.
-          # volumeMounts:
-          #   - name: artifacts
-          #     mountPath: /artifacts
-          # Uncomment for production: readiness = "is the pod ready to receive traffic?"
-          # readinessProbe:
-          #   httpGet:
-          #     path: /health
-          #     port: 8000
-          #   initialDelaySeconds: 5
-          #   periodSeconds: 10
-      # volumes:
-      #   - name: artifacts
-      #     persistentVolumeClaim:
-      #       claimName: cesar-artifacts
+          readinessProbe: #uncommented skeleton for readiness probe
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe: #added a liveness probe to restart the container if it becomes unresponsive
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 10
+            periodSeconds: 30
